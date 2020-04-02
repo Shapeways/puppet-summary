@@ -1106,28 +1106,56 @@ func (p *serveCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{})
 	SetupDB(p.dbType, p.dbFile)
 
 	//
+	// Create a cron scheduler
+	//
+	c := cron.New()
+
+	//
 	// If autoprune
 	//
 	if p.autoPrune {
 
-		//
-		// Create a cron scheduler
-		//
-		c := cron.New()
 
 		//
 		//  Every seven days prune the reports.
 		//
-		c.AddFunc("@weekly", func() {
-			fmt.Printf("Automatically pruning old reports")
+		c.AddFunc("@daily", func() {
+			fmt.Printf("Automatically pruning old reports\n")
 			pruneReports(p.prefix, 7, false)
 		})
 
-		//
-		// Launch the cron-scheduler.
-		//
-		c.Start()
 	}
+
+
+	//
+	//  Every hour update the orphan status.
+	//
+	c.AddFunc("@hourly", func() {
+		fmt.Printf("Updating orphans\n")
+		updateOrphans()
+	})
+
+	//
+	//  Every day clean unpinned orphan hosts.
+	//
+	c.AddFunc("@daily", func() {
+		fmt.Printf("Purging orphans\n")
+		purgeOrphans(30)
+	})
+
+	//
+	//  Every day purge history over 14 days.
+	//
+	c.AddFunc("@daily", func() {
+		fmt.Printf("Purging history\n")
+		pruneHistory()
+	})
+
+	//
+	// Launch the cron-scheduler.
+	//
+	c.Start()
+
 
 	//
 	// Start the server

@@ -155,6 +155,7 @@ func SetupDB(db_type_in string, path string) error {
 	          state       text,
 	          last_seen integer(4),
 	          runtime     integer,
+	          pinned      integer,
 	          UNIQUE(fqdn)
 	        )	        
 			`
@@ -233,6 +234,7 @@ func SetupDB(db_type_in string, path string) error {
 			  state varchar(255) DEFAULT NULL,
 			  last_seen int(4) DEFAULT NULL,
 			  runtime int(11) DEFAULT NULL,
+			  pinned tinyint DEFAULT 0,
 			  PRIMARY KEY (host_id),
 			  UNIQUE KEY fqdn (fqdn)
 			) ENGINE=InnoDB DEFAULT CHARSET=utf8
@@ -346,8 +348,6 @@ func addDB(data PuppetReport, path string) error {
 
 	updateHistory(at, data.State)
 
-	updateOrphans()
-
 	return nil
 }
 
@@ -385,7 +385,7 @@ func createHost(fqdn string) (int, error) {
 		return 0, errors.New("SetupDB not called")
 	}
 
-	_, err := db.Exec("INSERT INTO hosts(fqdn, state, last_seen, runtime) VALUES (?, '', 0, 0)", fqdn)
+	_, err := db.Exec("INSERT INTO hosts(fqdn, state, last_seen, runtime, pinned) VALUES (?, '', 0, 0, 0)", fqdn)
 	if err != nil {
 		return 0, err
 	}
@@ -419,6 +419,104 @@ func updateOrphans() {
 	if err != nil {
 		return 
 	}
+}
+
+//
+// Purge Orphan hosts.
+//
+func purgeOrphans(days int) {
+
+	//
+	// Ensure we have a DB-handle
+	//
+	if db == nil {
+		return
+	}
+
+	//
+	// The threshold which marks the difference between
+	// "current" and "orphaned"
+	//
+	// Here we set it to 4.5 days, which should be long
+	// enough to cover any hosts that were powered-off over
+	// a weekend.  (Friday + Saturday + Sunday + slack).
+	//
+	threshold := days * (24 * 60 * 60)
+
+	_, err := db.Exec("DELETE FROM hosts WHERE last_seen < ? AND pinned = 0", time.Now().Unix() - int64(threshold))
+	if err != nil {
+		return 
+	}
+}
+
+//
+// Prune history.
+//
+func pruneHistory() {
+
+	//
+	// Ensure we have a DB-handle
+	//
+	if db == nil {
+		return
+	}
+
+	history := 14
+
+	var count int
+	row := db.QueryRow("SELECT COUNT(*) FROM history")
+	row.Scan(&count)
+
+	if count <= history {
+		return
+	}
+
+	purge := (count - history)
+
+
+
+	sql_select := "SELECT id FROM history ORDER BY date LIMIT ?"
+
+	//
+	// Get the data.
+	//
+	stmt, err := db.Prepare(sql_select)
+	if err != nil {
+		return
+	}
+
+	rows, err := stmt.Query(purge)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+	defer rows.Close()
+
+	ids := ""
+
+	//
+	// For each row in the result-set
+	//
+	for rows.Next() {
+		var id int
+
+		err := rows.Scan(&id)
+		if err == nil {
+			if strings.Compare(ids, "") == 0 {
+				ids = strconv.Itoa(id)
+			} else {
+				ids = ids + ", " + strconv.Itoa(id)
+			}
+		}
+	}
+
+	sql_statment := "DELETE FROM history WHERE id IN (" + ids + ")"
+	_, err = db.Exec(sql_statment)
+
+	if err != nil {
+		fmt.Printf("Error purging history: %s\n", err)		
+	}
+		
 }
 
 //
@@ -848,7 +946,6 @@ func getHistory() ([]PuppetHistory, error) {
 		return nil, err
 	}
 
-	fmt.Printf("%s", res)
 	return res, err
 
 }
@@ -872,17 +969,13 @@ func pruneReports(prefix string, days int, verbose bool) error {
 	//
 	// Convert our query into something useful.
 	//
-	time := days * (24 * 60 * 60)
+	expire_time := days * (24 * 60 * 60)
+	now := time.Now().Unix()
 
 	//
 	// Find things that are old.
 	//
-	sql := ""
-	if strings.Compare(db_type, "sqlite3") == 0 {
-		sql = "SELECT id,yaml_file FROM reports WHERE ( ( strftime('%s','now') - executed_at ) > ? )"
-	} else if strings.Compare(db_type, "mysql") == 0 {
-		sql = "SELECT id,yaml_file FROM reports WHERE ( ( UNIX_TIMESTAMP() - executed_at ) > ? )"
-	}
+	sql := "SELECT id,yaml_file FROM reports WHERE ( ? - executed_at ) > ?"
 
 	find, err := db.Prepare(sql)
 	if err != nil {
@@ -892,11 +985,8 @@ func pruneReports(prefix string, days int, verbose bool) error {
 	//
 	// Remove old reports, en mass.
 	//
-	if strings.Compare(db_type, "sqlite3") == 0 {
-		sql = "DELETE FROM reports WHERE ( ( strftime('%s','now') - executed_at ) > ? )"
-	} else if strings.Compare(db_type, "mysql") == 0 {
-		sql = "DELETE FROM reports WHERE ( ( UNIX_TIMESTAMP() - executed_at ) > ? )"
-	}
+	sql = "DELETE FROM reports WHERE ( ( ? - executed_at ) > ? )"
+	
 	clean, err := db.Prepare(sql)
 	if err != nil {
 		return err
@@ -905,7 +995,7 @@ func pruneReports(prefix string, days int, verbose bool) error {
 	//
 	// Find the old reports.
 	//
-	rows, err := find.Query(time)
+	rows, err := find.Query(now, expire_time)
 	if err != nil {
 		return err
 	}
@@ -952,7 +1042,7 @@ func pruneReports(prefix string, days int, verbose bool) error {
 	//
 	//  Now cleanup the old records
 	//
-	_, err = clean.Exec(time)
+	_, err = clean.Exec(now, expire_time)
 	if err != nil {
 		return err
 	}
