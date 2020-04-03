@@ -143,6 +143,9 @@
             <tr>
               <th>Node</th>
               <th>State</th>
+              <th>Branch</th>
+              <th>Built</th>
+              <th>Role</th>
               <th>Seen</th>
             </tr>
             {{range .Nodes }}
@@ -153,6 +156,9 @@
                 data-href="/node/{{.Fqdn}}">
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
+              <td>{{.Branch}}</td>
+              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td>{{.Role}}</td>
               <td title="{{.At}}">{{.Ago}}</td>
             </tr>
             {{end}}
@@ -165,6 +171,9 @@
             <tr>
               <th>Node</th>
               <th>State</th>
+              <th>Branch</th>
+              <th>Built</th>
+              <th>Role</th>
               <th>Seen</th>
             </tr>
             {{range .Nodes }}
@@ -172,6 +181,9 @@
             <tr class="danger" data-href="/node/{{.Fqdn}}">
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
+              <td>{{.Branch}}</td>
+              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td>{{.Role}}</td>
               <td title="{{.At}}">{{.Ago}}</td>
             </tr>
             {{end}}
@@ -185,6 +197,9 @@
             <tr>
               <th>Node</th>
               <th>State</th>
+              <th>Branch</th>
+              <th>Built</th>
+              <th>Role</th>
               <th>Seen</th>
             </tr>
             {{range .Nodes }}
@@ -192,6 +207,9 @@
             <tr class="info" data-href="/node/{{.Fqdn}}">
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
+              <td>{{.Branch}}</td>
+              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td>{{.Role}}</td>
               <td title="{{.At}}">{{.Ago}}</td>
             </tr>
             {{end}}
@@ -205,6 +223,9 @@
             <tr>
               <th>Node</th>
               <th>State</th>
+              <th>Branch</th>
+              <th>Built</th>
+              <th>Role</th>
               <th>Seen</th>
             </tr>
             {{range .Nodes }}
@@ -212,6 +233,9 @@
             <tr data-href="/node/{{.Fqdn}}">
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
+              <td>{{.Branch}}</td>
+              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td>{{.Role}}</td>
               <td title="{{.At}}">{{.Ago}}</td>
             </tr>
             {{end}}
@@ -225,6 +249,9 @@
             <tr>
               <th>Node</th>
               <th>State</th>
+              <th>Branch</th>
+              <th>Built</th>
+              <th>Role</th>
               <th>Seen</th>
             </tr>
             {{range .Nodes }}
@@ -232,6 +259,9 @@
             <tr class="warning" data-href="/node/{{.Fqdn}}">
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
+              <td>{{.Branch}}</td>
+              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td>{{.Role}}</td>
               <td title="{{.At}}">{{.Ago}}</td>
             </tr>
             {{end}}

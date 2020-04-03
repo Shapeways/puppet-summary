@@ -31,11 +31,15 @@ var db_type string
 // runs on the front-page.
 //
 type PuppetRuns struct {
-	Fqdn    string
-	State   string
-	At      string
-	Ago     string
-	Runtime string
+	Fqdn     string
+	State    string
+	At       string
+	Ago      string
+	Runtime  string
+	Branch   string
+	Role     string
+	BuiltAt  string
+	BuiltAgo string
 }
 
 //
@@ -43,16 +47,20 @@ type PuppetRuns struct {
 // of puppet-runs against a particular node.
 //
 type PuppetReportSummary struct {
-	ID       string
-	Fqdn     string
-	State    string
-	At       string
-	Ago      string
-	Runtime  string
-	Failed   int
-	Changed  int
-	Total    int
-	YamlFile string
+	ID        string
+	Fqdn      string
+	State     string
+	At        string
+	Ago       string
+	Runtime   string
+	Branch    string
+	Role      string
+	BuiltAt   string
+	BuiltAgo  string
+	Failed    int
+	Changed   int
+	Total     int
+	YamlFile  string
 }
 
 //
@@ -122,6 +130,9 @@ func SetupDB(db_type_in string, path string) error {
 	          yaml_file   text,
 	          runtime     integer,
 	          executed_at integer(4),
+	          role        text,
+	          branch      text,
+	          build_time  integer(4),
 	          total       integer,
 	          skipped     integer,
 	          failed      integer,
@@ -152,8 +163,11 @@ func SetupDB(db_type_in string, path string) error {
 			CREATE TABLE IF NOT EXISTS hosts (
 	          host_id     INTEGER PRIMARY KEY AUTOINCREMENT,
 	          fqdn        text,
+	          role        text,
+	          branch      text,
+	          build_time  integer(4),
 	          state       text,
-	          last_seen integer(4),
+	          last_seen   integer(4),
 	          runtime     integer,
 	          pinned      integer,
 	          UNIQUE(fqdn)
@@ -209,6 +223,9 @@ func SetupDB(db_type_in string, path string) error {
 			  yaml_file varchar(255) DEFAULT NULL,
 			  runtime int(11) DEFAULT NULL,
 			  executed_at int(4) DEFAULT NULL,
+			  role varchar(255) DEFAULT NULL,
+			  branch varchar(255) DEFAULT NULL,
+			  build_time int(4) DEFAULT NULL,
 			  total int(11) DEFAULT NULL,
 			  skipped int(11) DEFAULT NULL,
 			  failed int(11) DEFAULT NULL,
@@ -231,6 +248,9 @@ func SetupDB(db_type_in string, path string) error {
 			CREATE TABLE IF NOT EXISTS hosts (
 			  host_id int(6) unsigned NOT NULL AUTO_INCREMENT,
 			  fqdn varchar(255) DEFAULT NULL,
+			  role varchar(255) DEFAULT NULL,
+			  branch varchar(255) DEFAULT NULL,
+			  build_time int(4) DEFAULT NULL,
 			  state varchar(255) DEFAULT NULL,
 			  last_seen int(4) DEFAULT NULL,
 			  runtime int(11) DEFAULT NULL,
@@ -316,7 +336,7 @@ func addDB(data PuppetReport, path string) error {
 		return err
 	}
 	
-	report_stmt, err := tx.Prepare("INSERT INTO reports(fqdn,host_id,state,yaml_file,executed_at,runtime, failed, changed, total, skipped) values(?,?,?,?,?,?,?,?,?,?)")
+	report_stmt, err := tx.Prepare("INSERT INTO reports(fqdn,host_id,state,yaml_file,executed_at,runtime, failed, changed, total, skipped, role, branch, build_time) values(?,?,?,?,?,?,?,?,?,?,?,?,?)")
 	if err != nil {
 		return err
 	}
@@ -331,9 +351,12 @@ func addDB(data PuppetReport, path string) error {
 		data.Failed,
 		data.Changed,
 		data.Total,
-		data.Skipped)
+		data.Skipped,
+		data.Role,
+		data.Branch,
+		data.BuildTime)
 
-	host_stmt, err := tx.Prepare("UPDATE hosts SET last_seen = ?, state = ?, runtime = ? WHERE host_id = ?")
+	host_stmt, err := tx.Prepare("UPDATE hosts SET last_seen = ?, state = ?, runtime = ?, role = ?, branch = ? , build_time = ? WHERE host_id = ?")
 	if err != nil {
 		return err
 	}
@@ -343,6 +366,9 @@ func addDB(data PuppetReport, path string) error {
 		at,
 		data.State,
 		data.Runtime,
+		data.Role,
+		data.Branch,
+		data.BuildTime,
 		host_id)
 	tx.Commit()
 
@@ -385,7 +411,7 @@ func createHost(fqdn string) (int, error) {
 		return 0, errors.New("SetupDB not called")
 	}
 
-	_, err := db.Exec("INSERT INTO hosts(fqdn, state, last_seen, runtime, pinned) VALUES (?, '', 0, 0, 0)", fqdn)
+	_, err := db.Exec("INSERT INTO hosts(fqdn, state, last_seen, runtime, pinned, role, branch, build_time) VALUES (?, '', 0, 0, 0, '', '', 0)", fqdn)
 	if err != nil {
 		return 0, err
 	}
@@ -685,7 +711,7 @@ func getIndexNodes() ([]PuppetRuns, error) {
 		return nil, errors.New("SetupDB not called")
 	}
 
-	sql := "SELECT fqdn, state, runtime, last_seen FROM hosts;"
+	sql := "SELECT fqdn, state, runtime, last_seen, branch, build_time, role FROM hosts;"
 	
 	//
 	// Select the status - for nodes seen in the past 24 hours.
@@ -704,7 +730,9 @@ func getIndexNodes() ([]PuppetRuns, error) {
 	for rows.Next() {
 		var tmp PuppetRuns
 		var at string
-		err := rows.Scan(&tmp.Fqdn, &tmp.State, &tmp.Runtime, &at)
+		var builtAt string
+
+		err := rows.Scan(&tmp.Fqdn, &tmp.State, &tmp.Runtime, &at, &tmp.Branch, &builtAt , &tmp.Role)
 		if err != nil {
 			return nil, err
 		}
@@ -718,10 +746,14 @@ func getIndexNodes() ([]PuppetRuns, error) {
 		// time "Ago"
 		//
 		tmp.Ago = timeRelative(at)
+		tmp.BuiltAgo = timeRelative(builtAt)
 
 		//
 		i, _ := strconv.ParseInt(at, 10, 64)
 		tmp.At = time.Unix(i, 0).Format("2006-01-02 15:04:05")
+
+		ib, _ := strconv.ParseInt(builtAt, 10, 64)
+		tmp.BuiltAt = time.Unix(ib, 0).Format("2006-01-02 15:04:05")
 
 		//
 		// Add the new record.
@@ -828,7 +860,7 @@ func getReports(fqdn string) ([]PuppetReportSummary, error) {
 	//
 	// Select the status.
 	//
-	stmt, err := db.Prepare("SELECT id, fqdn, state, executed_at, runtime, failed, changed, total, yaml_file FROM reports WHERE fqdn=? ORDER by executed_at DESC LIMIT 50")
+	stmt, err := db.Prepare("SELECT id, fqdn, state, executed_at, runtime, failed, changed, total, yaml_file, branch, build_time, role FROM reports WHERE fqdn=? ORDER by executed_at DESC LIMIT 50")
 	if err != nil {
 		return nil, err
 	}
@@ -852,7 +884,8 @@ func getReports(fqdn string) ([]PuppetReportSummary, error) {
 	for rows.Next() {
 		var tmp PuppetReportSummary
 		var at string
-		err := rows.Scan(&tmp.ID, &tmp.Fqdn, &tmp.State, &at, &tmp.Runtime, &tmp.Failed, &tmp.Changed, &tmp.Total, &tmp.YamlFile)
+		var builtAt string
+		err := rows.Scan(&tmp.ID, &tmp.Fqdn, &tmp.State, &at, &tmp.Runtime, &tmp.Failed, &tmp.Changed, &tmp.Total, &tmp.YamlFile, &tmp.Branch, &builtAt, &tmp.Role)
 		if err != nil {
 			return nil, err
 		}
@@ -866,9 +899,13 @@ func getReports(fqdn string) ([]PuppetReportSummary, error) {
 		// time "Ago"
 		//
 		tmp.Ago = timeRelative(at)
+		tmp.BuiltAgo = timeRelative(builtAt)
 
 		i, _ := strconv.ParseInt(at, 10, 64)
 		tmp.At = time.Unix(i, 0).Format("2006-01-02 15:04:05")
+
+		ib, _ := strconv.ParseInt(builtAt, 10, 64)
+		tmp.BuiltAt = time.Unix(ib, 0).Format("2006-01-02 15:04:05")
 
 		// Add the result of this fetch to our list.
 		NodeList = append(NodeList, tmp)

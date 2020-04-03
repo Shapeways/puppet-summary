@@ -105,6 +105,9 @@
           <th>ID</th>
           <th>Node</th>
           <th>Status</th>
+          <th>Branch</th>
+          <th>Built</th>
+          <th>Role</th>
           <th>Seen</th>
           <th>Failed</th>
           <th>Changed</th>
@@ -118,6 +121,9 @@
           <td id="data_{{incr $i}}">{{incr $i}}</td>
           <td>{{.Fqdn}}</td>
           <td>{{.State}}</td>
+          <td>{{.Branch}}</td>
+          <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+          <td>{{.Role}}</td>
           <td title="{{.At}}">{{.Ago}}</td>
           <td>{{.Failed}}</td>
           <td>{{.Changed}}</td>

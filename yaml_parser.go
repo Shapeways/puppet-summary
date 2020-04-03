@@ -18,6 +18,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"strconv"
 
 	"github.com/smallfish/simpleyaml"
 )
@@ -60,6 +61,21 @@ type PuppetReport struct {
 	// The time puppet took to run, in seconds.
 	//
 	Runtime string
+
+	//
+	// The role of the puppet server.
+	//
+	Role string
+
+	//
+	// The git branch.
+	//
+	Branch string
+
+	//
+	// The build time.
+	//
+	BuildTime int64
 
 	//
 	// A count of resources that failed, changed, were unchanged,
@@ -296,6 +312,27 @@ func parseLogs(y *simpleyaml.Yaml, out *PuppetReport) error {
 				key, val := key.Interface(), strct.Interface()
 				m[key.(string)] = fmt.Sprint(val)
 			}
+		}
+
+		reg := regexp.MustCompile(`^Using Git Branch: (.+)`)
+		a := reg.FindStringSubmatch(m["message"])
+		if len(a) == 2 {
+			out.Branch = a[1]
+		}
+
+		reg = regexp.MustCompile(`^Using Git Build: (.+)`)
+		a = reg.FindStringSubmatch(m["message"])
+		if len(a) == 2 {
+			i, err := strconv.Atoi(a[1])
+			if err == nil{
+				out.BuildTime = int64(i)
+			}
+		}
+
+		reg = regexp.MustCompile(`^Aws Auto Role: (.+)`)
+		a = reg.FindStringSubmatch(m["message"])
+		if len(a) == 2 {
+			out.Role = a[1]
 		}
 
 		if len(m["message"]) > 0 {
