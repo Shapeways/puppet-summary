@@ -40,6 +40,7 @@ type PuppetRuns struct {
 	Role     string
 	BuiltAt  string
 	BuiltAgo string
+	Pinned   string
 }
 
 //
@@ -711,7 +712,7 @@ func getIndexNodes() ([]PuppetRuns, error) {
 		return nil, errors.New("SetupDB not called")
 	}
 
-	sql := "SELECT fqdn, state, runtime, last_seen, branch, build_time, role FROM hosts;"
+	sql := "SELECT fqdn, state, runtime, last_seen, branch, build_time, role, pinned FROM hosts;"
 	
 	//
 	// Select the status - for nodes seen in the past 24 hours.
@@ -731,10 +732,16 @@ func getIndexNodes() ([]PuppetRuns, error) {
 		var tmp PuppetRuns
 		var at string
 		var builtAt string
+		var pinned int64
 
-		err := rows.Scan(&tmp.Fqdn, &tmp.State, &tmp.Runtime, &at, &tmp.Branch, &builtAt , &tmp.Role)
+		err := rows.Scan(&tmp.Fqdn, &tmp.State, &tmp.Runtime, &at, &tmp.Branch, &builtAt , &tmp.Role, &pinned)
 		if err != nil {
 			return nil, err
+		}
+
+		tmp.Pinned = "No"
+		if pinned == 1{
+			tmp.Pinned = "Yes"
 		}
 
 		//

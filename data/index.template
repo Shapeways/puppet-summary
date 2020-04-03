@@ -253,6 +253,7 @@
               <th>Built</th>
               <th>Role</th>
               <th>Seen</th>
+              <th>Pinned</th>
             </tr>
             {{range .Nodes }}
             {{if eq .State "orphaned" }}
@@ -263,6 +264,7 @@
               <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
               <td>{{.Role}}</td>
               <td title="{{.At}}">{{.Ago}}</td>
+              <td>{{.Pinned}}</td>
             </tr>
             {{end}}
             {{end}}
