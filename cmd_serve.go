@@ -1121,7 +1121,7 @@ func (p *serveCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{})
 		//
 		c.AddFunc("@daily", func() {
 			fmt.Printf("Automatically pruning old reports\n")
-			pruneReports(p.prefix, 7, false)
+			pruneReports(p.prefix, 14, false)
 		})
 
 	}

@@ -753,14 +753,18 @@ func getIndexNodes() ([]PuppetRuns, error) {
 		// time "Ago"
 		//
 		tmp.Ago = timeRelative(at)
-		tmp.BuiltAgo = timeRelative(builtAt)
+		if strings.Compare(builtAt, "0") == 0 {
+			tmp.BuiltAgo = "-"
+			tmp.BuiltAt = "-"
+		}else{
+			tmp.BuiltAgo = timeRelative(builtAt)
+			ib, _ := strconv.ParseInt(builtAt, 10, 64)
+			tmp.BuiltAt = time.Unix(ib, 0).Format("2006-01-02 15:04:05")
+		}
 
 		//
 		i, _ := strconv.ParseInt(at, 10, 64)
 		tmp.At = time.Unix(i, 0).Format("2006-01-02 15:04:05")
-
-		ib, _ := strconv.ParseInt(builtAt, 10, 64)
-		tmp.BuiltAt = time.Unix(ib, 0).Format("2006-01-02 15:04:05")
 
 		//
 		// Add the new record.
@@ -906,13 +910,17 @@ func getReports(fqdn string) ([]PuppetReportSummary, error) {
 		// time "Ago"
 		//
 		tmp.Ago = timeRelative(at)
-		tmp.BuiltAgo = timeRelative(builtAt)
+		if strings.Compare(builtAt, "0") == 0 {
+			tmp.BuiltAgo = "-"
+			tmp.BuiltAt = "-"
+		}else{
+			tmp.BuiltAgo = timeRelative(builtAt)
+			ib, _ := strconv.ParseInt(builtAt, 10, 64)
+			tmp.BuiltAt = time.Unix(ib, 0).Format("2006-01-02 15:04:05")
+		}
 
 		i, _ := strconv.ParseInt(at, 10, 64)
 		tmp.At = time.Unix(i, 0).Format("2006-01-02 15:04:05")
-
-		ib, _ := strconv.ParseInt(builtAt, 10, 64)
-		tmp.BuiltAt = time.Unix(ib, 0).Format("2006-01-02 15:04:05")
 
 		// Add the result of this fetch to our list.
 		NodeList = append(NodeList, tmp)
