@@ -31,17 +31,18 @@ var db_type string
 // runs on the front-page.
 //
 type PuppetRuns struct {
-	Fqdn     string
-	State    string
-	At       string
-	Epoch   string
-	Ago      string
-	Runtime  string
-	Branch   string
-	Role     string
-	BuiltAt  string
-	BuiltAgo string
-	Pinned   string
+	Fqdn       string
+	State      string
+	At         string
+	Epoch      string
+	Ago        string
+	Runtime    string
+	Branch     string
+	Role       string
+	BuiltAt    string
+	BuiltAgo   string
+	BuiltEpoch string
+	Pinned     string
 }
 
 //
@@ -753,6 +754,7 @@ func getIndexNodes() ([]PuppetRuns, error) {
 		// contain the literal time, and also the relative
 		// time "Ago"
 		//
+		tmp.BuiltEpoch = builtAt
 		tmp.Epoch = at
 		tmp.Ago = timeRelative(at)
 		if strings.Compare(builtAt, "0") == 0 {

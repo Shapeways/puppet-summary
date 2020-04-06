@@ -166,7 +166,7 @@
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
               <td>{{.Branch}}</td>
-              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td data-text="{{.BuiltEpoch}}" data-sort-value="{{.BuiltEpoch}}" title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
               <td>{{.Role}}</td>
               <td data-text="{{.Epoch}}" data-sort-value="{{.Epoch}}" title="{{.At}}">{{.Ago}}</td>
             </tr>
@@ -193,7 +193,7 @@
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
               <td>{{.Branch}}</td>
-              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td data-text="{{.BuiltEpoch}}" data-sort-value="{{.BuiltEpoch}}" title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
               <td>{{.Role}}</td>
               <td data-text="{{.Epoch}}" data-sort-value="{{.Epoch}}" title="{{.At}}">{{.Ago}}</td>
             </tr>
@@ -221,7 +221,7 @@
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
               <td>{{.Branch}}</td>
-              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td data-text="{{.BuiltEpoch}}" data-sort-value="{{.BuiltEpoch}}" title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
               <td>{{.Role}}</td>
               <td data-text="{{.Epoch}}" data-sort-value="{{.Epoch}}" title="{{.At}}">{{.Ago}}</td>
             </tr>
@@ -249,7 +249,7 @@
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
               <td>{{.Branch}}</td>
-              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td data-text="{{.BuiltEpoch}}" data-sort-value="{{.BuiltEpoch}}" title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
               <td>{{.Role}}</td>
               <td data-text="{{.Epoch}}" data-sort-value="{{.Epoch}}" title="{{.At}}">{{.Ago}}</td>
             </tr>
@@ -278,7 +278,7 @@
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
               <td>{{.Branch}}</td>
-              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td data-text="{{.BuiltEpoch}}" data-sort-value="{{.BuiltEpoch}}" title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
               <td>{{.Role}}</td>
               <td data-text="{{.Epoch}}" data-sort-value="{{.Epoch}}" title="{{.At}}">{{.Ago}}</td>
               <td>{{.Pinned}}</td>
