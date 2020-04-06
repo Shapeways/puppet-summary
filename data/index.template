@@ -151,6 +151,9 @@
             <tr>
               <th>Node</th>
               <th>State</th>
+              <th>Branch</th>
+              <th>Built</th>
+              <th>Role</th>
               <th>Seen</th>
             </tr>
             </thead>
@@ -162,6 +165,9 @@
                 data-href="{{$.Urlprefix }}/node/{{.Fqdn}}">
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
+              <td>{{.Branch}}</td>
+              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td>{{.Role}}</td>
               <td data-text="{{.Epoch}}" data-sort-value="{{.Epoch}}" title="{{.At}}">{{.Ago}}</td>
             </tr>
             {{end}}
@@ -175,6 +181,9 @@
             <tr>
               <th>Node</th>
               <th>State</th>
+              <th>Branch</th>
+              <th>Built</th>
+              <th>Role</th>
               <th>Seen</th>
             </tr>
             </thead>
@@ -183,6 +192,9 @@
             <tr class="danger" data-href="{{$.Urlprefix }}/node/{{.Fqdn}}">
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
+              <td>{{.Branch}}</td>
+              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td>{{.Role}}</td>
               <td data-text="{{.Epoch}}" data-sort-value="{{.Epoch}}" title="{{.At}}">{{.Ago}}</td>
             </tr>
             {{end}}
@@ -197,6 +209,9 @@
             <tr>
               <th>Node</th>
               <th>State</th>
+              <th>Branch</th>
+              <th>Built</th>
+              <th>Role</th>
               <th>Seen</th>
             </tr>
             </thead>
@@ -205,6 +220,9 @@
             <tr class="info" data-href="{{$.Urlprefix }}/node/{{.Fqdn}}">
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
+              <td>{{.Branch}}</td>
+              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td>{{.Role}}</td>
               <td data-text="{{.Epoch}}" data-sort-value="{{.Epoch}}" title="{{.At}}">{{.Ago}}</td>
             </tr>
             {{end}}
@@ -219,6 +237,9 @@
             <tr>
               <th>Node</th>
               <th>State</th>
+              <th>Branch</th>
+              <th>Built</th>
+              <th>Role</th>
               <th>Seen</th>
             </tr>
             </thead>
@@ -227,6 +248,9 @@
             <tr data-href="{{$.Urlprefix }}/node/{{.Fqdn}}">
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
+              <td>{{.Branch}}</td>
+              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td>{{.Role}}</td>
               <td data-text="{{.Epoch}}" data-sort-value="{{.Epoch}}" title="{{.At}}">{{.Ago}}</td>
             </tr>
             {{end}}
@@ -241,7 +265,11 @@
             <tr>
               <th>Node</th>
               <th>State</th>
+              <th>Branch</th>
+              <th>Built</th>
+              <th>Role</th>
               <th>Seen</th>
+              <th>Pinned</th>
             </tr>
             </thead>
             {{range .Nodes }}
@@ -249,7 +277,11 @@
             <tr class="warning" data-href="{{$.Urlprefix }}/node/{{.Fqdn}}">
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
+              <td>{{.Branch}}</td>
+              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td>{{.Role}}</td>
               <td data-text="{{.Epoch}}" data-sort-value="{{.Epoch}}" title="{{.At}}">{{.Ago}}</td>
+              <td>{{.Pinned}}</td>
             </tr>
             {{end}}
             {{end}}

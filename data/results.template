@@ -56,7 +56,11 @@
             <tr>
               <th>Node</th>
               <th>State</th>
+              <th>Branch</th>
+              <th>Built</th>
+              <th>Role</th>
               <th>Seen</th>
+              <th>Pinned</th>
             </tr>
             {{range .Nodes }}
             <tr
@@ -66,7 +70,11 @@
                 data-href="{{$.Urlprefix}}/node/{{.Fqdn}}">
               <td>{{.Fqdn}}</td>
               <td>{{.State}}</td>
+              <td>{{.Branch}}</td>
+              <td title="{{.BuiltAt}}">{{.BuiltAgo}}</td>
+              <td>{{.Role}}</td>
               <td title="{{.At}}">{{.Ago}}</td>
+              <td>{{.Pinned}}</td>
             </tr>
             {{end}}
           </table>

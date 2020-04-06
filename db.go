@@ -31,12 +31,17 @@ var db_type string
 // runs on the front-page.
 //
 type PuppetRuns struct {
-	Fqdn    string
-	State   string
-	At      string
+	Fqdn     string
+	State    string
+	At       string
 	Epoch   string
-	Ago     string
-	Runtime string
+	Ago      string
+	Runtime  string
+	Branch   string
+	Role     string
+	BuiltAt  string
+	BuiltAgo string
+	Pinned   string
 }
 
 //
@@ -44,16 +49,20 @@ type PuppetRuns struct {
 // of puppet-runs against a particular node.
 //
 type PuppetReportSummary struct {
-	ID       string
-	Fqdn     string
-	State    string
-	At       string
-	Ago      string
-	Runtime  string
-	Failed   int
-	Changed  int
-	Total    int
-	YamlFile string
+	ID        string
+	Fqdn      string
+	State     string
+	At        string
+	Ago       string
+	Runtime   string
+	Branch    string
+	Role      string
+	BuiltAt   string
+	BuiltAgo  string
+	Failed    int
+	Changed   int
+	Total     int
+	YamlFile  string
 }
 
 //
@@ -117,26 +126,108 @@ func SetupDB(db_type_in string, path string) error {
 
 	        CREATE TABLE IF NOT EXISTS reports (
 	          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	          host_id     INTEGER,
 	          fqdn        text,
 	          state       text,
 	          yaml_file   text,
 	          runtime     integer,
 	          executed_at integer(4),
+	          role        text,
+	          branch      text,
+	          build_time  integer(4),
 	          total       integer,
 	          skipped     integer,
 	          failed      integer,
 	          changed     integer
-	        )
+	        )	        
 			`
+		//
+		// Create the table, if missing.
+		//
+		// Errors here are pretty unlikely.
+		//
+		_, err = db.Exec(sqlStmt)
+		if err != nil {
+			return err
+		}
+
+		sqlStmt = `
+
+	        PRAGMA automatic_index = ON;
+	        PRAGMA cache_size = 32768;
+	        PRAGMA journal_size_limit = 67110000;
+	        PRAGMA locking_mode = NORMAL;
+	        PRAGMA synchronous = NORMAL;
+	        PRAGMA temp_store = MEMORY;
+	        PRAGMA journal_mode = WAL;
+	        PRAGMA wal_autocheckpoint = 16384;
+
+			CREATE TABLE IF NOT EXISTS hosts (
+	          host_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+	          fqdn        text,
+	          role        text,
+	          branch      text,
+	          build_time  integer(4),
+	          state       text,
+	          last_seen   integer(4),
+	          runtime     integer,
+	          pinned      integer,
+	          UNIQUE(fqdn)
+	        )	        
+			`
+		//
+		// Create the table, if missing.
+		//
+		// Errors here are pretty unlikely.
+		//
+		_, err = db.Exec(sqlStmt)
+		if err != nil {
+			return err
+		}
+
+		sqlStmt = `
+
+	        PRAGMA automatic_index = ON;
+	        PRAGMA cache_size = 32768;
+	        PRAGMA journal_size_limit = 67110000;
+	        PRAGMA locking_mode = NORMAL;
+	        PRAGMA synchronous = NORMAL;
+	        PRAGMA temp_store = MEMORY;
+	        PRAGMA journal_mode = WAL;
+	        PRAGMA wal_autocheckpoint = 16384;
+
+			CREATE TABLE IF NOT EXISTS history (
+	          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	          date        text,
+	          failed      integer,
+	          changed     integer,
+	          unchanged   integer,
+	          UNIQUE(date)
+	        )	        
+			`
+		//
+		// Create the table, if missing.
+		//
+		// Errors here are pretty unlikely.
+		//
+		_, err = db.Exec(sqlStmt)
+		if err != nil {
+			return err
+		}
+
 	} else if strings.Compare(db_type_in, "mysql") == 0 {
 		sqlStmt = `
 			CREATE TABLE IF NOT EXISTS reports (
 			  id int(6) unsigned NOT NULL AUTO_INCREMENT,
+			  host_id int(6) unsigned NOT NULL,
 			  fqdn varchar(255) DEFAULT NULL,
 			  state varchar(255) DEFAULT NULL,
 			  yaml_file varchar(255) DEFAULT NULL,
 			  runtime int(11) DEFAULT NULL,
 			  executed_at int(4) DEFAULT NULL,
+			  role varchar(255) DEFAULT NULL,
+			  branch varchar(255) DEFAULT NULL,
+			  build_time int(4) DEFAULT NULL,
 			  total int(11) DEFAULT NULL,
 			  skipped int(11) DEFAULT NULL,
 			  failed int(11) DEFAULT NULL,
@@ -145,19 +236,67 @@ func SetupDB(db_type_in string, path string) error {
 			  KEY fqdn (fqdn)
 			) ENGINE=InnoDB DEFAULT CHARSET=utf8
 			`
+		//
+		// Create the table, if missing.
+		//
+		// Errors here are pretty unlikely.
+		//
+		_, err = db.Exec(sqlStmt)
+		if err != nil {
+			return err
+		}
+
+		sqlStmt = `
+			CREATE TABLE IF NOT EXISTS hosts (
+			  host_id int(6) unsigned NOT NULL AUTO_INCREMENT,
+			  fqdn varchar(255) DEFAULT NULL,
+			  role varchar(255) DEFAULT NULL,
+			  branch varchar(255) DEFAULT NULL,
+			  build_time int(4) DEFAULT NULL,
+			  state varchar(255) DEFAULT NULL,
+			  last_seen int(4) DEFAULT NULL,
+			  runtime int(11) DEFAULT NULL,
+			  pinned tinyint DEFAULT 0,
+			  PRIMARY KEY (host_id),
+			  UNIQUE KEY fqdn (fqdn)
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8
+			`
+		//
+		// Create the table, if missing.
+		//
+		// Errors here are pretty unlikely.
+		//
+		_, err = db.Exec(sqlStmt)
+		if err != nil {
+			return err
+		}
+
+		sqlStmt = `
+			CREATE TABLE IF NOT EXISTS history (
+			  id        int(6) unsigned NOT NULL AUTO_INCREMENT,
+			  date      varchar(255) DEFAULT NULL,
+			  failed    int(11) DEFAULT 0,
+			  changed   int(11) DEFAULT 0,
+			  unchanged int(11) DEFAULT 0,
+			  PRIMARY KEY (id),
+			  UNIQUE KEY date (date)
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8
+			`
+		//
+		// Create the table, if missing.
+		//
+		// Errors here are pretty unlikely.
+		//
+		_, err = db.Exec(sqlStmt)
+		if err != nil {
+			return err
+		}
+
 	} else {
 		return errors.New("Invalid db type, sqlite3 or mysql supported")
 	}
 
-	//
-	// Create the table, if missing.
-	//
-	// Errors here are pretty unlikely.
-	//
-	_, err = db.Exec(sqlStmt)
-	if err != nil {
-		return err
-	}
+
 
 	return nil
 }
@@ -179,26 +318,300 @@ func addDB(data PuppetReport, path string) error {
 		return errors.New("SetupDB not called")
 	}
 
+	host_id, err := getHostId(data.Fqdn)
+	if err != nil {
+		return err
+	}
+
+	if host_id == 0 {
+		err = nil
+		host_id, err = createHost(data.Fqdn)
+		if err != nil {
+			return err
+		}
+	}
+
+	at := time.Now().Unix()
+
 	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare("INSERT INTO reports(fqdn,state,yaml_file,executed_at,runtime, failed, changed, total, skipped) values(?,?,?,?,?,?,?,?,?)")
+	
+	report_stmt, err := tx.Prepare("INSERT INTO reports(fqdn,host_id,state,yaml_file,executed_at,runtime, failed, changed, total, skipped, role, branch, build_time) values(?,?,?,?,?,?,?,?,?,?,?,?,?)")
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	defer report_stmt.Close()
 
-	stmt.Exec(data.Fqdn,
+	report_stmt.Exec(data.Fqdn,
+		host_id,
 		data.State,
 		path,
-		time.Now().Unix(),
+		at,
 		data.Runtime,
 		data.Failed,
 		data.Changed,
 		data.Total,
-		data.Skipped)
+		data.Skipped,
+		data.Role,
+		data.Branch,
+		data.BuildTime)
+
+	host_stmt, err := tx.Prepare("UPDATE hosts SET last_seen = ?, state = ?, runtime = ?, role = ?, branch = ? , build_time = ? WHERE host_id = ?")
+	if err != nil {
+		return err
+	}
+	defer host_stmt.Close()
+
+	host_stmt.Exec(
+		at,
+		data.State,
+		data.Runtime,
+		data.Role,
+		data.Branch,
+		data.BuildTime,
+		host_id)
 	tx.Commit()
+
+	updateHistory(at, data.State)
+
+	return nil
+}
+
+//
+// Get host id.
+//
+func getHostId(fqdn string) (int, error) {
+
+	//
+	// Ensure we have a DB-handle
+	//
+	if db == nil {
+		return 0, errors.New("SetupDB not called")
+	}
+
+	var host_id int
+	row := db.QueryRow("SELECT host_id FROM hosts WHERE fqdn = ?", fqdn)
+	err := row.Scan(&host_id)
+
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return host_id, err
+}
+
+//
+// insert host.
+//
+func createHost(fqdn string) (int, error) {
+
+	//
+	// Ensure we have a DB-handle
+	//
+	if db == nil {
+		return 0, errors.New("SetupDB not called")
+	}
+
+	_, err := db.Exec("INSERT INTO hosts(fqdn, state, last_seen, runtime, pinned, role, branch, build_time) VALUES (?, '', 0, 0, 0, '', '', 0)", fqdn)
+	if err != nil {
+		return 0, err
+	}
+
+	return getHostId(fqdn)
+}
+
+//
+// update orphan hosts.
+//
+func updateOrphans() {
+
+	//
+	// Ensure we have a DB-handle
+	//
+	if db == nil {
+		return
+	}
+
+	//
+	// The threshold which marks the difference between
+	// "current" and "orphaned"
+	//
+	// Here we set it to 4.5 days, which should be long
+	// enough to cover any hosts that were powered-off over
+	// a weekend.  (Friday + Saturday + Sunday + slack).
+	//
+	threshold := 3.5 * (24 * 60 * 60)
+
+	_, err := db.Exec("UPDATE hosts SET state = 'orphaned' WHERE last_seen < ?", time.Now().Unix() - int64(threshold))
+	if err != nil {
+		return 
+	}
+}
+
+//
+// Purge Orphan hosts.
+//
+func purgeOrphans(days int) {
+
+	//
+	// Ensure we have a DB-handle
+	//
+	if db == nil {
+		return
+	}
+
+	//
+	// The threshold which marks the difference between
+	// "current" and "orphaned"
+	//
+	// Here we set it to 4.5 days, which should be long
+	// enough to cover any hosts that were powered-off over
+	// a weekend.  (Friday + Saturday + Sunday + slack).
+	//
+	threshold := days * (24 * 60 * 60)
+
+	_, err := db.Exec("DELETE FROM hosts WHERE last_seen < ? AND pinned = 0", time.Now().Unix() - int64(threshold))
+	if err != nil {
+		return 
+	}
+}
+
+//
+// Prune history.
+//
+func pruneHistory() {
+
+	//
+	// Ensure we have a DB-handle
+	//
+	if db == nil {
+		return
+	}
+
+	history := 14
+
+	var count int
+	row := db.QueryRow("SELECT COUNT(*) FROM history")
+	row.Scan(&count)
+
+	if count <= history {
+		return
+	}
+
+	purge := (count - history)
+
+
+
+	sql_select := "SELECT id FROM history ORDER BY date LIMIT ?"
+
+	//
+	// Get the data.
+	//
+	stmt, err := db.Prepare(sql_select)
+	if err != nil {
+		return
+	}
+
+	rows, err := stmt.Query(purge)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+	defer rows.Close()
+
+	ids := ""
+
+	//
+	// For each row in the result-set
+	//
+	for rows.Next() {
+		var id int
+
+		err := rows.Scan(&id)
+		if err == nil {
+			if strings.Compare(ids, "") == 0 {
+				ids = strconv.Itoa(id)
+			} else {
+				ids = ids + ", " + strconv.Itoa(id)
+			}
+		}
+	}
+
+	sql_statment := "DELETE FROM history WHERE id IN (" + ids + ")"
+	_, err = db.Exec(sql_statment)
+
+	if err != nil {
+		fmt.Printf("Error purging history: %s\n", err)		
+	}
+		
+}
+
+//
+// update orphan hosts.
+//
+func updateHistory(date int64, state string) error {
+
+	//
+	// Ensure we have a DB-handle
+	//
+	if db == nil {
+		return errors.New("SetupDB not called")
+	}
+
+
+	sql_lookup := ""
+	if strings.Compare(db_type, "sqlite3") == 0 {
+		sql_lookup = "SELECT id FROM history WHERE date = strftime('%Y/%m/%d', DATE(?, 'unixepoch'))"
+	} else if strings.Compare(db_type, "mysql") == 0 {
+		sql_lookup = "SELECT id FROM history WHERE date = from_unixtime(?, '%Y/%m/%d')"
+	}
+
+	id := 0
+
+	row := db.QueryRow(sql_lookup, date)
+	err := row.Scan(&id)
+
+	sql_insert := ""
+	if err == sql.ErrNoRows {
+		if strings.Compare(db_type, "sqlite3") == 0 {
+			sql_insert = "INSERT INTO history(date, failed, changed, unchanged) VALUES (strftime('%Y/%m/%d', DATE(?, 'unixepoch')), 0, 0, 0)"
+		} else if strings.Compare(db_type, "mysql") == 0 {
+			sql_insert = "INSERT INTO history(date, failed, changed, unchanged) VALUES (from_unixtime(?, '%Y/%m/%d'), 0, 0, 0)"
+		}
+		_, err := db.Exec(sql_insert, date)
+		if err != nil {
+			fmt.Printf("there - %s", err)
+		}
+
+		row := db.QueryRow(sql_lookup, date)
+		err = row.Scan(&id)
+
+		if err == sql.ErrNoRows {
+			fmt.Printf("here - %s", err)
+		}
+	}
+
+
+	failed := 0
+	changed := 0
+	unchanged := 0
+
+	switch {
+		case strings.Compare(state, "failed") == 0: 
+			failed = 1
+		case strings.Compare(state, "changed") == 0: 
+			changed = 1
+		case strings.Compare(state, "unchanged") == 0: 
+			unchanged = 1
+	}
+
+	sql_update := "UPDATE history SET failed = failed + ?, changed = changed + ?, unchanged = unchanged + ? WHERE id = ?"
+
+	_, err = db.Exec(sql_update, failed, changed, unchanged, id)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -294,42 +707,22 @@ func getIndexNodes() ([]PuppetRuns, error) {
 	var NodeList []PuppetRuns
 
 	//
-	// The threshold which marks the difference between
-	// "current" and "orphaned"
-	//
-	// Here we set it to 4.5 days, which should be long
-	// enough to cover any hosts that were powered-off over
-	// a weekend.  (Friday + Saturday + Sunday + slack).
-	//
-	threshold := 3.5 * (24 * 60 * 60)
-
-	//
 	// Ensure we have a DB-handle
 	//
 	if db == nil {
 		return nil, errors.New("SetupDB not called")
 	}
 
-	sql := ""
-	if strings.Compare(db_type, "sqlite3") == 0 {
-		sql = "SELECT fqdn, state, runtime, max(executed_at) FROM reports WHERE  ( ( strftime('%s','now') - executed_at ) < ? ) GROUP by fqdn;"
-	} else if strings.Compare(db_type, "mysql") == 0 {
-		sql = "SELECT fqdn, (SELECT n.state FROM reports n WHERE n.fqdn = r.fqdn ORDER BY executed_at DESC LIMIT 1) as state, runtime, max(executed_at) FROM reports r WHERE  ( ( UNIX_TIMESTAMP() - executed_at ) < ? ) GROUP by fqdn;"
-	}
-
+	sql := "SELECT fqdn, state, runtime, last_seen, branch, build_time, role, pinned FROM hosts;"
+	
 	//
 	// Select the status - for nodes seen in the past 24 hours.
 	//
-	rows, err := db.Query(sql, threshold)
+	rows, err := db.Query(sql)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
-	//
-	// We'll keep track of which nodes we've seen recently.
-	//
-	seen := make(map[string]int)
 
 	//
 	// For each row in the result-set
@@ -339,9 +732,17 @@ func getIndexNodes() ([]PuppetRuns, error) {
 	for rows.Next() {
 		var tmp PuppetRuns
 		var at string
-		err = rows.Scan(&tmp.Fqdn, &tmp.State, &tmp.Runtime, &at)
+		var builtAt string
+		var pinned int64
+
+		err := rows.Scan(&tmp.Fqdn, &tmp.State, &tmp.Runtime, &at, &tmp.Branch, &builtAt , &tmp.Role, &pinned)
 		if err != nil {
 			return nil, err
+		}
+
+		tmp.Pinned = "No"
+		if pinned == 1{
+			tmp.Pinned = "Yes"
 		}
 
 		//
@@ -354,15 +755,18 @@ func getIndexNodes() ([]PuppetRuns, error) {
 		//
 		tmp.Epoch = at
 		tmp.Ago = timeRelative(at)
+		if strings.Compare(builtAt, "0") == 0 {
+			tmp.BuiltAgo = "-"
+			tmp.BuiltAt = "-"
+		}else{
+			tmp.BuiltAgo = timeRelative(builtAt)
+			ib, _ := strconv.ParseInt(builtAt, 10, 64)
+			tmp.BuiltAt = time.Unix(ib, 0).Format("2006-01-02 15:04:05")
+		}
 
 		//
 		i, _ := strconv.ParseInt(at, 10, 64)
 		tmp.At = time.Unix(i, 0).Format("2006-01-02 15:04:05")
-
-		//
-		// Mark this node as non-orphaned.
-		//
-		seen[tmp.Fqdn] = 1
 
 		//
 		// Add the new record.
@@ -371,66 +775,6 @@ func getIndexNodes() ([]PuppetRuns, error) {
 
 	}
 	err = rows.Err()
-	if err != nil {
-		return nil, err
-	}
-
-	if strings.Compare(db_type, "sqlite3") == 0 {
-		sql = "SELECT fqdn, state, runtime, max(executed_at) FROM reports WHERE ( ( strftime('%s','now') - executed_at ) > ? ) GROUP by fqdn;"
-	} else if strings.Compare(db_type, "mysql") == 0 {
-		sql = "SELECT fqdn, state, runtime, max(executed_at) FROM reports WHERE ( ( UNIX_TIMESTAMP() - executed_at ) > ? ) GROUP by fqdn;"
-	}
-
-	//
-	// Now look for orphaned nodes.
-	//
-	rows2, err2 := db.Query(sql, threshold)
-	if err2 != nil {
-		return nil, err
-	}
-	defer rows2.Close()
-
-	//
-	// For each row in the result-set
-	//
-	// Parse into a structure and add to the list.
-	//
-	for rows2.Next() {
-		var tmp PuppetRuns
-		var at string
-		err = rows2.Scan(&tmp.Fqdn, &tmp.State, &tmp.Runtime, &at)
-		if err != nil {
-			return nil, err
-		}
-
-		//
-		// At this point `at` is a string containing
-		// seconds-past-the-epoch.
-		//
-		// We want that to contain a human-readable
-		// string so we first convert to an integer, then
-		// parse as a Unix-timestamp
-		//
-		tmp.Ago = timeRelative(at)
-
-		//
-		i, _ := strconv.ParseInt(at, 10, 64)
-		tmp.At = time.Unix(i, 0).Format("2006-01-02 15:04:05")
-
-		//
-		// Force the state to be `orphaned`.
-		//
-		tmp.State = "orphaned"
-
-		//
-		// If we've NOT already seen this node then
-		// we can add it to our result set.
-		//
-		if seen[tmp.Fqdn] != 1 {
-			NodeList = append(NodeList, tmp)
-		}
-	}
-	err = rows2.Err()
 	if err != nil {
 		return nil, err
 	}
@@ -528,7 +872,7 @@ func getReports(fqdn string) ([]PuppetReportSummary, error) {
 	//
 	// Select the status.
 	//
-	stmt, err := db.Prepare("SELECT id, fqdn, state, executed_at, runtime, failed, changed, total, yaml_file FROM reports WHERE fqdn=? ORDER by executed_at DESC LIMIT 50")
+	stmt, err := db.Prepare("SELECT id, fqdn, state, executed_at, runtime, failed, changed, total, yaml_file, branch, build_time, role FROM reports WHERE fqdn=? ORDER by executed_at DESC LIMIT 50")
 	if err != nil {
 		return nil, err
 	}
@@ -552,7 +896,8 @@ func getReports(fqdn string) ([]PuppetReportSummary, error) {
 	for rows.Next() {
 		var tmp PuppetReportSummary
 		var at string
-		err = rows.Scan(&tmp.ID, &tmp.Fqdn, &tmp.State, &at, &tmp.Runtime, &tmp.Failed, &tmp.Changed, &tmp.Total, &tmp.YamlFile)
+		var builtAt string
+		err := rows.Scan(&tmp.ID, &tmp.Fqdn, &tmp.State, &at, &tmp.Runtime, &tmp.Failed, &tmp.Changed, &tmp.Total, &tmp.YamlFile, &tmp.Branch, &builtAt, &tmp.Role)
 		if err != nil {
 			return nil, err
 		}
@@ -566,6 +911,14 @@ func getReports(fqdn string) ([]PuppetReportSummary, error) {
 		// time "Ago"
 		//
 		tmp.Ago = timeRelative(at)
+		if strings.Compare(builtAt, "0") == 0 {
+			tmp.BuiltAgo = "-"
+			tmp.BuiltAt = "-"
+		}else{
+			tmp.BuiltAgo = timeRelative(builtAt)
+			ib, _ := strconv.ParseInt(builtAt, 10, 64)
+			tmp.BuiltAt = time.Unix(ib, 0).Format("2006-01-02 15:04:05")
+		}
 
 		i, _ := strconv.ParseInt(at, 10, 64)
 		tmp.At = time.Unix(i, 0).Format("2006-01-02 15:04:05")
@@ -602,20 +955,10 @@ func getHistory() ([]PuppetHistory, error) {
 	//
 	var res []PuppetHistory
 
-	//
-	// An array to hold the unique dates we've seen.
-	//
-	var dates []string
-
-	sql := ""
-	if strings.Compare(db_type, "sqlite3") == 0 {
-		sql = "SELECT DISTINCT(strftime('%d/%m/%Y', DATE(executed_at, 'unixepoch'))) FROM reports"
-	} else if strings.Compare(db_type, "mysql") == 0 {
-		sql = "SELECT DISTINCT(from_unixtime(executed_at, '%Y/%m/%d')) FROM reports"
-	}
+	sql := "SELECT date, failed, changed, unchanged FROM history ORDER BY date"
 
 	//
-	// Get all the distinct dates we have data for.
+	// Get the data.
 	//
 	stmt, err := db.Prepare(sql)
 	if err != nil {
@@ -634,83 +977,26 @@ func getHistory() ([]PuppetHistory, error) {
 	//
 	for rows.Next() {
 		var d string
-		err = rows.Scan(&d)
+		var f int
+		var c int
+		var u int
+
+		err := rows.Scan(&d, &f, &c, &u)
 		if err != nil {
 			return nil, errors.New("failed to scan SQL")
 		}
 
-		dates = append(dates, d)
+		var x PuppetHistory
+		x.Changed = strconv.Itoa(c)
+		x.Unchanged = strconv.Itoa(u)
+		x.Failed = strconv.Itoa(f)
+		x.Date = d
+
+		res = append(res, x)
 	}
 	err = rows.Err()
 	if err != nil {
 		return nil, err
-	}
-
-	//
-	// Now we have all the unique dates in `dates`.
-	//
-	for _, known := range dates {
-
-		//
-		// The result for this date.
-		//
-		var x PuppetHistory
-		x.Changed = "0"
-		x.Unchanged = "0"
-		x.Failed = "0"
-		x.Date = known
-
-
-		sql := ""
-		if strings.Compare(db_type, "sqlite3") == 0 {
-			sql = "SELECT distinct state, COUNT(state) AS CountOf FROM reports WHERE strftime('%d/%m/%Y', DATE(executed_at, 'unixepoch'))=? GROUP by state"
-		} else if strings.Compare(db_type, "mysql") == 0 {
-			sql = "SELECT distinct state, COUNT(state) AS CountOf FROM reports WHERE from_unixtime(executed_at, '%Y/%m/%d')=? GROUP by state"
-		}
-
-		stmt, err = db.Prepare(sql)
-		if err != nil {
-			return nil, err
-		}
-
-		rows, err = stmt.Query(known)
-		if err != nil {
-			return nil, err
-		}
-		defer stmt.Close()
-		defer rows.Close()
-
-		//
-		// For each row in the result-set
-		//
-		for rows.Next() {
-			var name string
-			var count string
-
-			err = rows.Scan(&name, &count)
-			if err != nil {
-				return nil, errors.New("failed to scan SQL")
-			}
-			if name == "changed" {
-				x.Changed = count
-			}
-			if name == "unchanged" {
-				x.Unchanged = count
-			}
-			if name == "failed" {
-				x.Failed = count
-			}
-		}
-		err = rows.Err()
-		if err != nil {
-			return nil, err
-		}
-
-		//
-		// Add this days result.
-		//
-		res = append(res, x)
-
 	}
 
 	return res, err
@@ -736,17 +1022,13 @@ func pruneReports(prefix string, days int, verbose bool) error {
 	//
 	// Convert our query into something useful.
 	//
-	time := days * (24 * 60 * 60)
+	expire_time := days * (24 * 60 * 60)
+	now := time.Now().Unix()
 
 	//
 	// Find things that are old.
 	//
-	sql := ""
-	if strings.Compare(db_type, "sqlite3") == 0 {
-		sql = "SELECT id,yaml_file FROM reports WHERE ( ( strftime('%s','now') - executed_at ) > ? )"
-	} else if strings.Compare(db_type, "mysql") == 0 {
-		sql = "SELECT id,yaml_file FROM reports WHERE ( ( UNIX_TIMESTAMP() - executed_at ) > ? )"
-	}
+	sql := "SELECT id,yaml_file FROM reports WHERE ( ? - executed_at ) > ?"
 
 	find, err := db.Prepare(sql)
 	if err != nil {
@@ -756,11 +1038,8 @@ func pruneReports(prefix string, days int, verbose bool) error {
 	//
 	// Remove old reports, en mass.
 	//
-	if strings.Compare(db_type, "sqlite3") == 0 {
-		sql = "DELETE FROM reports WHERE ( ( strftime('%s','now') - executed_at ) > ? )"
-	} else if strings.Compare(db_type, "mysql") == 0 {
-		sql = "DELETE FROM reports WHERE ( ( UNIX_TIMESTAMP() - executed_at ) > ? )"
-	}
+	sql = "DELETE FROM reports WHERE ( ( ? - executed_at ) > ? )"
+	
 	clean, err := db.Prepare(sql)
 	if err != nil {
 		return err
@@ -769,7 +1048,7 @@ func pruneReports(prefix string, days int, verbose bool) error {
 	//
 	// Find the old reports.
 	//
-	rows, err := find.Query(time)
+	rows, err := find.Query(now, expire_time)
 	if err != nil {
 		return err
 	}
@@ -816,7 +1095,7 @@ func pruneReports(prefix string, days int, verbose bool) error {
 	//
 	//  Now cleanup the old records
 	//
-	_, err = clean.Exec(time)
+	_, err = clean.Exec(now, expire_time)
 	if err != nil {
 		return err
 	}
