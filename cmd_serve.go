@@ -437,9 +437,9 @@ func AsyncReportSubmissionHandler(res http.ResponseWriter, req *http.Request) {
 
 
 	b := make([]byte, 16)
-	_, err := rand.Read(b)
-	if err != nil {
-	    log.Fatal(err)
+	_, errRead := rand.Read(b)
+	if errRead != nil {
+	    fmt.Printf("Error: %s\n", errRead.Error())
 	}
 	uuid := fmt.Sprintf("%x-%x-%x-%x-%x",
 	    b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
@@ -467,24 +467,24 @@ func AsyncReportSubmissionHandler(res http.ResponseWriter, req *http.Request) {
 	fmt.Fprint(res, string(out))
 }
 
-func AsyncReportSubmissionHandlerWorker(id int, jobs <-chan string) {
+func AsyncReportSubmissionWorker(id int, jobs <-chan string) {
     for j := range jobs {
         fmt.Println("worker", id, "started  job", j)
-        AsyncReportSubmissionHandler(j)
+        AsyncReportSubmissionSaver(j)
         fmt.Println("worker", id, "finished job", j)
     }
 }
 
-func AsyncReportSubmissionHandler(string uuid){
+func AsyncReportSubmissionSaver(uuid string){
 
 	// read file uuid into content
-	path := filepath.Join("/tmp/", uuid)
+	pathTemp := filepath.Join("/tmp/", uuid)
 
 	//
 	// Read the temp file.
 	//
-	content, err := ioutil.ReadAll(path)
-	if err != nil {
+	content, err := ioutil.ReadFile(pathTemp)
+    if err != nil {
 		fmt.Printf("Failed to read temp file")
 		return
 	}
@@ -494,7 +494,7 @@ func AsyncReportSubmissionHandler(string uuid){
 	//
 	report, err := ParsePuppetReport(content)
 	if err != nil {
-		status = http.StatusInternalServerError
+		fmt.Printf("Failed to parse Yaml")
 		return
 	}
 
@@ -1406,7 +1406,7 @@ func (p *serveCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{})
 
 	
 	for w := 1; w <= 4; w++ {
-        go AsyncReportSubmissionHandlerWorker(w, asyncUploadJobs)
+        go AsyncReportSubmissionWorker(w, asyncUploadJobs)
     }
 
 	//
