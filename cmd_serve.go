@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/ioutil"
+	"crypto/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -33,6 +34,8 @@ import (
 // ReportPrefix is the path beneath which reports are stored.
 //
 var ReportPrefix = "reports"
+
+var asyncUploadJobs = make(chan string)
 
 //
 // Exists is a utility method to determine whether a file/directory exists.
@@ -383,6 +386,164 @@ func ReportSubmissionHandler(res http.ResponseWriter, req *http.Request) {
 	//
 	out := fmt.Sprintf("{\"host\":\"%s\"}", report.Fqdn)
 	fmt.Fprint(res, string(out))
+
+}
+
+//
+// AsyncReportSubmissionHandler is the handler for the HTTP end-point:
+//
+//	POST /async/upload
+//
+// The input is read, and parsed as Yaml, and assuming that succeeds
+// then the data is written beneath ./reports/$hostname/$timestamp
+// and a summary-record is inserted into our SQLite database.
+//
+// the work is handled by a queue of workers to respond back to puppet faster
+//
+//
+func AsyncReportSubmissionHandler(res http.ResponseWriter, req *http.Request) {
+	var (
+		status int
+		err    error
+	)
+	defer func() {
+		if nil != err {
+			http.Error(res, err.Error(), status)
+
+			// Don't spam stdout when running test-cases.
+			if flag.Lookup("test.v") == nil {
+				fmt.Printf("Error: %s\n", err.Error())
+			}
+		}
+	}()
+
+	//
+	// Ensure this was a POST-request
+	//
+	if req.Method != "POST" {
+		err = errors.New("must be called via HTTP-POST")
+		status = http.StatusInternalServerError
+		return
+	}
+
+	//
+	// Read the body of the request.
+	//
+	content, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		status = http.StatusInternalServerError
+		return
+	}
+
+
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err != nil {
+	    log.Fatal(err)
+	}
+	uuid := fmt.Sprintf("%x-%x-%x-%x-%x",
+	    b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+
+
+	uuid = "puppet-summary-tmp-" + uuid
+
+	path := filepath.Join("/tmp/", uuid)
+
+	//
+	// Create the temp file, on-disk.
+	//
+	err = ioutil.WriteFile(path, content, 0644)
+	if err != nil {
+		status = http.StatusInternalServerError
+		return
+	}
+
+	asyncUploadJobs <- uuid
+
+	//
+	// Show something to the caller.
+	//
+	out := fmt.Sprintf("{\"job-queued\":\"%s\"}", uuid)
+	fmt.Fprint(res, string(out))
+}
+
+func AsyncReportSubmissionHandlerWorker(id int, jobs <-chan string) {
+    for j := range jobs {
+        fmt.Println("worker", id, "started  job", j)
+        AsyncReportSubmissionHandler(j)
+        fmt.Println("worker", id, "finished job", j)
+    }
+}
+
+func AsyncReportSubmissionHandler(string uuid){
+
+	// read file uuid into content
+	path := filepath.Join("/tmp/", uuid)
+
+	//
+	// Read the temp file.
+	//
+	content, err := ioutil.ReadAll(path)
+	if err != nil {
+		fmt.Printf("Failed to read temp file")
+		return
+	}
+
+	//
+	// Parse the YAML into something we can work with.
+	//
+	report, err := ParsePuppetReport(content)
+	if err != nil {
+		status = http.StatusInternalServerError
+		return
+	}
+
+	//
+	// Create a report directory for this host, unless it already exists.
+	//
+	dir := filepath.Join(ReportPrefix, report.Fqdn)
+	if !Exists(dir) {
+		err = os.MkdirAll(dir, 0755)
+		if err != nil {
+			fmt.Printf("Failed to create host directory")
+			return
+		}
+	}
+
+	//
+	// Does this report already exist?  This shouldn't happen
+	// in a usual setup, but will happen if you're repeatedly
+	// importing reports manually from a puppet-server.
+	//
+	// (Which is something you might do when testing the dashboard.)
+	//
+	path := filepath.Join(dir, report.Hash)
+
+	if Exists(path) {
+		fmt.Printf("Ignoring duplicate submission")
+		return
+	}
+
+	//
+	// Create the new report-file, on-disk.
+	//
+	err = ioutil.WriteFile(path, content, 0644)
+	if err != nil {
+		fmt.Printf("Error saving file")
+		return
+	}
+
+	//
+	// Record that report in our SQLite database
+	//
+	relativePath := filepath.Join(report.Fqdn, report.Hash)
+
+	addDB(report, relativePath)
+
+	e := os.Remove("/tmp/" + uuid) 
+    if e != nil { 
+        fmt.Printf("Error deleteing file: " + uuid) 
+    } 
 
 }
 
@@ -1062,6 +1223,12 @@ func serve(settings serveCmd) {
 	router.HandleFunc("/upload", ReportSubmissionHandler).Methods("POST")
 
 	//
+	// Upload a new report.
+	//
+	router.HandleFunc("/async/upload/", AsyncReportSubmissionHandler).Methods("POST")
+	router.HandleFunc("/async/upload", AsyncReportSubmissionHandler).Methods("POST")
+
+	//
 	// Search nodes.
 	//
 	router.HandleFunc("/search/", SearchHandler).Methods("POST")
@@ -1236,6 +1403,11 @@ func (p *serveCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{})
 	//
 	c.Start()
 
+
+	
+	for w := 1; w <= 4; w++ {
+        go AsyncReportSubmissionHandlerWorker(w, asyncUploadJobs)
+    }
 
 	//
 	// Start the server
